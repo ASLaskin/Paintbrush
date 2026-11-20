@@ -147,8 +147,45 @@ static BOOL kSWDocumentWillShowSheet = YES;
 	NSRect viewRect = [paintView frame];
 	NSRect tempRect = [paintView calculateWindowBounds:viewRect];
 	
+	// Shirt canvases open zoomed out, with the window sized to show the whole shirt
+	if ([SWJNShirt isShirtCanvas:[dataSource size]])
+	{
+		CGFloat scale = 0.5;
+		[scrollView setCurrentySelectedIndex:2]; // 50% in SWJNScalingScrollView.scaleFactors
+		[scrollView setScaleTo:scale adjustingScalePushButton:YES];
+
+		NSSize shirtSize = [SWJNShirt boundsAroundCanvas:[paintView frame]].size;
+		NSRect content = NSMakeRect(0, 0, shirtSize.width * scale, shirtSize.height * scale);
+		NSRect visible = [[[paintView window] screen] visibleFrame];
+		NSRect frame = [[paintView window] frameRectForContentRect:content];
+		frame.size.width = MIN(frame.size.width, visible.size.width);
+		frame.size.height = MIN(frame.size.height, visible.size.height);
+		frame.origin.x = NSMidX(visible) - frame.size.width / 2;
+		frame.origin.y = NSMidY(visible) - frame.size.height / 2;
+		tempRect = frame;
+	}
+
 	// Apply the changes to the new document
 	[[paintView window] setFrame:tempRect display:YES animate:YES];
+	[clipView center];
+}
+
+
+// File > Export PNG: a scaled, optionally transparent copy. The document is untouched.
+- (IBAction)exportImage:(id)sender
+{
+	[toolbox finaliseForCurrentTool];
+
+	// The main image is stored upside down; flip a copy upright like dataOfType does
+	NSBitmapImageRep *bitmap = [dataSource mainImage];
+	[SWImageTools flipImageVertical:bitmap];
+	NSBitmapImageRep *upright = [bitmap copy];
+	[SWImageTools flipImageVertical:bitmap];
+
+	NSString *name = [[[self displayName] stringByDeletingPathExtension] stringByAppendingString:@" export"];
+	SWJNExportPanel *panel = [[SWJNExportPanel alloc] initWithImage:upright
+															 isShirt:[SWJNShirt isShirtCanvas:[dataSource size]]];
+	[panel runOn:[self windowForSheet] suggestedName:name];
 }
 
 
@@ -514,31 +551,38 @@ static BOOL kSWDocumentWillShowSheet = YES;
 }
 
 
-// Called whenever Copy or Cut are called (copies the overlay image to the pasteboard)
-// TODO: Relieve some of this method's dependencies on the Selection tool
-- (void)writeImageToPasteboard:(NSPasteboard *)pb
+// The Selection tool, when it is current and has something selected
+- (SWJNSelectionTool *)activeSelection
 {
-	NSAssert([[toolbox currentTool] isKindOfClass:[SWSelectionTool class]], 
-			 @"How are we copying without a SWSelectionTool as the active tool?");
-	if ([[toolbox currentTool] isKindOfClass:[SWSelectionTool class]])
-	{
-		SWSelectionTool *currentTool = (SWSelectionTool *)[toolbox currentTool];
-		
-		NSBitmapImageRep *selectedImage = [currentTool selectedImage];		
-		
-		// Make sure we flip the image before we put it in the pasteboard
-		[SWImageTools flipImageVertical:selectedImage];
-		
-        [pb declareTypes:[NSArray arrayWithObject:NSPasteboardTypeTIFF] owner:self];
-        [pb setData:[selectedImage TIFFRepresentation] forType:NSPasteboardTypeTIFF];
-		
-		// Now flip it again
-		[SWImageTools flipImageVertical:selectedImage];
-	}
+	SWJNTool *tool = [toolbox currentTool];
+	if ([tool isKindOfClass:[SWJNSelectionTool class]] && [(SWJNSelectionTool *)tool hasSelection])
+		return (SWJNSelectionTool *)tool;
+	return nil;
 }
 
 
-// Cut: same as copy, but clears the overlay
+// Makes the Selection tool current and hands it this document's bitmaps
+- (SWJNSelectionTool *)switchToSelection
+{
+	[toolboxController changeCurrentToolWithString:@"Selection"];
+	SWJNSelectionTool *tool = (SWJNSelectionTool *)[toolbox toolForLabel:@"Selection"];
+	[tool attachWithMain:[dataSource mainImage] buffer:[dataSource bufferImage]];
+	return tool;
+}
+
+
+// Called whenever Copy or Cut are called (copies the selection to the pasteboard)
+- (void)writeImageToPasteboard:(NSPasteboard *)pb
+{
+	NSImage *image = [[self activeSelection] selectionImage];
+	if (!image)
+		return;
+	[pb clearContents];
+	[pb writeObjects:@[image]];
+}
+
+
+// Cut: same as copy, but throws the selection away
 - (IBAction)cut:(id)sender
 {
 	[self copy:sender];
@@ -553,73 +597,33 @@ static BOOL kSWDocumentWillShowSheet = YES;
 }
 
 
-// Paste
+// Paste: the image lands in the middle of what's on screen
 - (IBAction)paste:(id)sender
 {
-    [self handleUndoWithImageData:nil frame:NSZeroRect];
-    [toolboxController switchToScissors:nil];
-    
-    NSData *data = nil;
-    
-    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
-    for (NSPasteboardItem *item in pasteboard.pasteboardItems) {
-        if ([pasteboard availableTypeFromArray:@[NSPasteboardTypeFileURL]]) {
-            NSArray<NSURL *> *urls = [pasteboard readObjectsForClasses:@[[NSURL class]] options:@{
-                NSPasteboardURLReadingFileURLsOnlyKey : @YES
-            }];
-            
-            data = [NSData dataWithContentsOfURL:urls.firstObject];
-            break;
-        }
-        
-        if ([pasteboard availableTypeFromArray:@[NSPasteboardTypeTIFF]]) {
-            data = [item dataForType:NSPasteboardTypeTIFF];
-            break;
-        }
-    }
-    
-    if (data) {
-        // [paintView cursorUpdate:[NSApp currentEvent]]; // TODO: (jarrodnorwell) check this
-        NSBitmapImageRep *temp = [[NSBitmapImageRep alloc] initWithData:data];
+	NSImage *image = [SWJNImageImport imageFrom:[NSPasteboard generalPasteboard]];
+	if (!image)
+		return;
 
-        NSPoint origin = [[paintView superview] bounds].origin;
-        if (origin.x < 0) origin.x = 0;
-        if (origin.y < 0) origin.y = 0;
+	// At the pointer when it's over the canvas, otherwise mid screen
+	NSRect visible = NSIntersectionRect([paintView visibleRect], [paintView bounds]);
+	NSPoint mouse = [paintView convertPoint:[[paintView window] mouseLocationOutsideOfEventStream] fromView:nil];
+	NSPoint point = NSPointInRect(mouse, visible) ? mouse : NSMakePoint(NSMidX(visible), NSMidY(visible));
+	[self placeImage:image centeredAt:point];
+}
 
-        NSRect rect = NSZeroRect;
-        rect.origin = origin;
 
-        // Use ceiling because pixels can be fractions, but the tool assumes integer values
-        rect.size = NSMakeSize(ceil([temp size].width), ceil([temp size].height));
-        
-        [dataSource restoreBufferImageFromData:data];
-        
-        // As always, flip the image to be viewed in our flipped view
-        [SWImageTools flipImageVertical:[dataSource bufferImage]];
-
-        SWJNTool *oldTool = [toolbox currentTool];
-        
-        [toolbox setCurrentTool:[toolbox toolForLabel:@"Selection"]]; // should be this?
-        [(SWSelectionTool *)[toolbox currentTool] setClippingRect:rect
-                                                         forImage:[dataSource bufferImage]
-                                                    withMainImage:[dataSource mainImage]];
-        [paintView setNeedsDisplay:YES];
-        [toolbox setCurrentTool:oldTool];
-    }
+- (void)placeImage:(NSImage *)image centeredAt:(NSPoint)point
+{
+	SWJNSelectionTool *tool = [self switchToSelection];
+	[tool paste:image centeredAt:point];
+	[paintView setNeedsDisplay:YES];
 }
 
 
 // Select all
 - (IBAction)selectAll:(id)sender
 {
-	[toolboxController switchToScissors:nil];
-	
-	[[toolbox currentTool] setSavedPoint:NSZeroPoint];
-    void([toolbox.currentTool performDrawFrom:NSMakePoint(paintView.bounds.size.width, paintView.bounds.size.height)
-                                           on:dataSource.mainImage and:dataSource.bufferImage
-                                          for:SWJNMouseEventUp]);
-	
-	// [paintView cursorUpdate:[NSApp currentEvent]]; // TODO: (jarrodnorwell) check this
+	[[self switchToSelection] selectAll];
 	[paintView setNeedsDisplay:YES];
 }
 
@@ -677,20 +681,11 @@ static BOOL kSWDocumentWillShowSheet = YES;
 		(action == @selector(cut:)) || 
 		(action == @selector(crop:))) 
 	{
-		return ([[[toolbox currentTool] class] isEqualTo:[SWSelectionTool class]] && 
-				[(SWSelectionTool *)[toolbox currentTool] isSelected]);
+		return [self activeSelection] != nil;
 	} 
 	else if (action == @selector(paste:)) 
 	{
-		NSArray *array = [[NSPasteboard generalPasteboard] types];
-		BOOL paste = NO;
-		id object;
-		for (object in array) 
-		{
-            if ([object isEqualToString:NSPasteboardTypeTIFF])
-				paste = YES;
-		}
-		return paste;
+		return [SWJNImageImport canReadFrom:[NSPasteboard generalPasteboard]];
 	}
 	else if (action == @selector(zoomIn:))
 		return scrollView.scale < 16;
@@ -743,32 +738,28 @@ static BOOL kSWDocumentWillShowSheet = YES;
 }
 
 
-// Used to shrink the image background while also isolating a specific
-// section of the image to save
+// Shrinks the canvas to the selection
 - (IBAction)crop:(id)sender
 {
-	// First we need to make a temporary copy of what's selected by the selection tool
-	if ([[toolbox currentTool] isKindOfClass:[SWSelectionTool class]])
-	{
-		NSRect rect = [(SWSelectionTool *)[toolbox currentTool] clippingRect];
-		
-		NSBitmapImageRep *croppedImage = [(SWSelectionTool *)[toolbox currentTool] selectedImage];
-		
-		// This is also important!
-		[toolbox finaliseForCurrentTool];
-		
-		[self handleUndoWithImageData:nil frame:NSZeroRect];
-				
-		// Pretend we are a resize
-		[dataSource resizeToSize:rect.size scaleImage:NO];
-		
-		// Set the image
-		[dataSource restoreMainImageFromData:[croppedImage TIFFRepresentation]];
-		
-		// Redraw the Paint view and the clip view
-		[paintView setFrame:NSMakeRect(0.0, 0.0, rect.size.width, rect.size.height)];
-		[clipView setNeedsDisplay:YES];
-	}
+	SWJNSelectionTool *selection = [self activeSelection];
+	if (!selection)
+		return;
+
+	NSRect rect = [selection cropRect];
+	[toolbox finaliseForCurrentTool];
+	if (NSIsEmptyRect(rect))
+		return;
+
+	NSBitmapImageRep *croppedImage = [SWImageTools cropImage:[dataSource mainImage] toRect:rect];
+	[self handleUndoWithImageData:nil frame:NSZeroRect];
+
+	// Pretend we are a resize
+	[dataSource resizeToSize:rect.size scaleImage:NO];
+	[dataSource restoreMainImageFromData:[croppedImage TIFFRepresentation]];
+
+	[paintView setFrame:NSMakeRect(0.0, 0.0, rect.size.width, rect.size.height)];
+	[clipView setNeedsDisplay:YES];
+	[paintView setNeedsDisplay:YES];
 }
 
 

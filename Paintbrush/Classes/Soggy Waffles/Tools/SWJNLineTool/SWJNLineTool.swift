@@ -49,6 +49,7 @@ final class SWJNPlacedLine: SWJNPlacedObject {
     var end: NSPoint
     let width: CGFloat
     let color: NSColor
+    var isInteracting = false
 
     init(start: NSPoint, end: NSPoint, width: CGFloat, color: NSColor) {
         self.start = start
@@ -107,6 +108,11 @@ final class SWJNPlacedLine: SWJNPlacedObject {
             start = origStart + delta
             end = origEnd + delta
         }
+    }
+
+    func nudge(by offset: NSPoint) {
+        start = start + offset
+        end = end + offset
     }
 
     private func distanceToSegment(_ p: NSPoint) -> CGFloat {

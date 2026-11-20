@@ -54,14 +54,14 @@ import Foundation
     
     var document: SWDocument
     
-    var paintView: SWPaintView
-    var toolbox: SWToolbox
+    // Looked up through the document: tools are created while the document is
+    // still initializing, before its paint view and toolbox exist.
+    var paintView: SWPaintView { document.paintView }
+    var toolbox: SWToolbox { document.toolbox }
     var toolboxController: SWToolboxController
     
-    init(document: SWDocument, paintView: SWPaintView, toolbox: SWToolbox, toolboxController: SWToolboxController) {
+    init(document: SWDocument, paintView: SWPaintView?, toolbox: SWToolbox?, toolboxController: SWToolboxController) {
         self.document = document
-        self.paintView = paintView
-        self.toolbox = toolbox
         self.toolboxController = toolboxController
         super.init()
         
@@ -137,6 +137,8 @@ import Foundation
     
     // MARK: Additional
     func deleteKey() {}
+    /// Arrow keys. Returns true if the tool moved something.
+    func nudge(dx: CGFloat, dy: CGFloat) -> Bool { false }
     /// Draws tool UI (handles, guides) over the canvas in paint view coordinates.
     func drawOverlay(scale: CGFloat) {}
     func mouseDidMove(to point: NSPoint) {}

@@ -57,9 +57,8 @@
 	// Ensure the correct cursor is displayed when opening a new document
     // [self cursorUpdate:[NSApp currentEvent]];
 	
-	// Set up drag stuff
-	[[self window] registerForDraggedTypes:[NSArray arrayWithObjects:
-                                            NSPasteboardTypeTIFF, nil]];
+	// Drop images (files or image data) onto the canvas
+	[self registerForDraggedTypes:@[NSPasteboardTypeFileURL, NSPasteboardTypeTIFF, NSPasteboardTypePNG]];
 	
 	[self setNeedsDisplay:YES];	
 }
@@ -458,6 +457,10 @@
 		// Delete keys (back and forward)
 		[self clearOverlay];
 	} 
+	else if ([self handleArrowKey:event])
+	{
+		// Nudged the placed selection, line or text
+	}
 	else if ([self handleShortcut:event])
 	{
 		// Handled: size or palette key
@@ -466,6 +469,48 @@
 	{
 		[[[toolboxController window] contentView] keyDown:event];
 	}
+}
+
+
+// Arrow keys move whatever is placed by 1 pixel, or 10 with Shift
+- (BOOL)handleArrowKey:(NSEvent *)event
+{
+	CGFloat step = ([event modifierFlags] & NSEventModifierFlagShift) ? 10 : 1;
+	CGFloat dx = 0, dy = 0;
+	switch ([event keyCode]) {
+		case 123: dx = -step; break;
+		case 124: dx = step; break;
+		case 125: dy = step; break;
+		case 126: dy = -step; break;
+		default: return NO;
+	}
+	if (![toolbox.currentTool nudgeWithDx:dx dy:dy])
+		return NO;
+	[self setNeedsDisplay:YES];
+	return YES;
+}
+
+
+#pragma mark Drag and drop
+
+- (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender
+{
+	return [SWJNImageImport canReadFrom:[sender draggingPasteboard]] ? NSDragOperationCopy : NSDragOperationNone;
+}
+
+
+- (BOOL)performDragOperation:(id<NSDraggingInfo>)sender
+{
+	NSImage *image = [SWJNImageImport imageFrom:[sender draggingPasteboard]];
+	SWDocument *document = [[[self window] windowController] document];
+	if (!image || !document)
+		return NO;
+
+	NSPoint point = [self convertPoint:[sender draggingLocation] fromView:nil];
+	[document placeImage:image centeredAt:point];
+	[[self window] makeKeyAndOrderFront:self];
+	[[self window] makeFirstResponder:self];
+	return YES;
 }
 
 

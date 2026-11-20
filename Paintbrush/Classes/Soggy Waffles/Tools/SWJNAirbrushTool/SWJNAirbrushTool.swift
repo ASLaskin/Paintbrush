@@ -15,7 +15,7 @@ import Foundation
     }
     
     var variables: Variables
-    override init(document: SWDocument, paintView: SWPaintView, toolbox: SWToolbox, toolboxController: SWToolboxController) {
+    override init(document: SWDocument, paintView: SWPaintView?, toolbox: SWToolbox?, toolboxController: SWToolboxController) {
         variables = Variables(isCurrentlyAirbrushing: false,
                               currentAirbrushPoint: .zero,
                               airbrushUpdateTimer: nil)

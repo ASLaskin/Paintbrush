@@ -134,6 +134,54 @@ import Foundation
         setScale(to: SWJNScalingScrollView.scaleFactors[currentySelectedIndex], adjustingScalePushButton: true)
     }
     
+    // MARK: Zoom at the cursor
+
+    static let minimumScale: CGFloat = 0.1
+    static let maximumScale: CGFloat = 8
+
+    /// Command + scroll zooms around the pointer; plain scrolling still scrolls.
+    override func scrollWheel(with event: NSEvent) {
+        guard event.modifierFlags.contains(.command) else {
+            super.scrollWheel(with: event)
+            return
+        }
+        // Trackpads send many small precise deltas, mouse wheels a few coarse lines
+        let sensitivity: CGFloat = event.hasPreciseScrollingDeltas ? 0.01 : 0.1
+        zoom(by: exp(event.scrollingDeltaY * sensitivity), at: event)
+    }
+
+    /// Pinch to zoom, also around the pointer.
+    override func magnify(with event: NSEvent) {
+        zoom(by: 1 + event.magnification, at: event)
+    }
+
+    private func zoom(by factor: CGFloat, at event: NSEvent) {
+        guard let clipView = contentView as? SWJNCenteringClipView, factor.isFinite, factor > 0 else { return }
+        let newScale = min(max(scale * factor, Self.minimumScale), Self.maximumScale)
+        guard newScale != scale else { return }
+
+        // Keep the canvas point under the pointer fixed while the scale changes
+        let anchor = clipView.convert(event.locationInWindow, from: nil)
+        let old = clipView.bounds
+        let fractionX = (anchor.x - old.minX) / old.width
+        let fractionY = (anchor.y - old.minY) / old.height
+
+        var bounds = NSRect.zero
+        bounds.size = NSSize(width: clipView.frame.width / newScale, height: clipView.frame.height / newScale)
+        bounds.origin = NSPoint(x: anchor.x - fractionX * bounds.width, y: anchor.y - fractionY * bounds.height)
+
+        scale = newScale
+        clipView.bounds = clipView.constrainBoundsRect(bounds)
+        reflectScrolledClipView(clipView)
+
+        // Let the zoom buttons step on from the closest preset
+        let factors = SWJNScalingScrollView.scaleFactors
+        currentySelectedIndex = factors.indices.min { abs(factors[$0] - newScale) < abs(factors[$1] - newScale) } ?? currentySelectedIndex
+        scalePushButton?.title = "\(Int((newScale * 100).rounded()))%"
+        window?.resizeIncrements = NSSize(width: 1, height: 1)
+        documentView?.needsDisplay = true
+    }
+
     func scaleToDefault() {
         currentySelectedIndex = 4
     }

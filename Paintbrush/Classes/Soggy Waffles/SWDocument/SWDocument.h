@@ -74,6 +74,7 @@
 - (IBAction)crop:(id)sender;
 - (IBAction)invertColors:(id)sender;
 - (void)showTextSheet:(NSNotification *)n;
+- (IBAction)exportImage:(id)sender;
 - (void)undoLevelChanged:(NSNotification *)n;
 
 // Sheets for size!
@@ -87,6 +88,8 @@
 
 // For copy-and-paste
 - (void)writeImageToPasteboard:(NSPasteboard *)pb;
+// Pastes or drops an image as an editable selection centered on point
+- (void)placeImage:(NSImage *)image centeredAt:(NSPoint)point;
 
 + (void)setWillShowSheet:(BOOL)showSheet;
 

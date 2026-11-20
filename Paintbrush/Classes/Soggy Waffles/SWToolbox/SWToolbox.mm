@@ -109,7 +109,8 @@
         [SWJNLineTool class],
         [SWJNTextTool class],
         [SWJNEyedropperTool class],
-        [SWJNZoomTool class]
+        [SWJNZoomTool class],
+        [SWJNSelectionTool class]
     ];
     
     /*

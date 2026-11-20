@@ -22,9 +22,13 @@ protocol SWJNPlacedObject: AnyObject {
     func hitTest(_ point: NSPoint, scale: CGFloat) -> SWJNPlacementHandle?
     /// Opaque copy of the geometry, taken when a drag starts.
     func snapshot() -> Any
+    /// Set while a handle is dragged, so heavy objects can draw quickly.
+    var isInteracting: Bool { get set }
     /// Applies a drag of `handle` that started at `start` (with geometry
     /// `original`) and is now at `point`.
     func drag(_ handle: SWJNPlacementHandle, from start: NSPoint, to point: NSPoint, original: Any, snap: Bool)
+    /// Moves the object by `offset` (arrow keys).
+    func nudge(by offset: NSPoint)
 }
 
 enum SWJNPlacementHandle: Equatable {
@@ -62,6 +66,7 @@ enum SWJNPlacementHandle: Equatable {
         case .down:
             if let placed, let handle = placed.hitTest(point, scale: paintView.viewScale()) {
                 activeDrag = (handle, point, placed.snapshot())
+                placed.isInteracting = true
                 return nil
             }
             commit()
@@ -79,6 +84,7 @@ enum SWJNPlacementHandle: Equatable {
         case .up:
             if activeDrag != nil {
                 activeDrag = nil
+                placed?.isInteracting = false
                 renderPlaced()
             } else {
                 creationEvent(.up, at: point, main: mainBitmap, buffer: bufferBitmap)
@@ -93,11 +99,19 @@ enum SWJNPlacementHandle: Equatable {
     // MARK: Placement lifecycle
 
     /// Puts a new editable object on the canvas. Registers the undo step now,
-    /// so Command Z removes the object even before it is committed.
-    func place(_ object: SWJNPlacedObject) {
-        document.handleUndo(withImageData: nil, frame: .zero)
+    /// so Command Z removes the object even before it is committed. Pass
+    /// `registerUndo: false` when the caller already registered it.
+    func place(_ object: SWJNPlacedObject, registerUndo: Bool = true) {
+        if registerUndo { document.handleUndo(withImageData: nil, frame: .zero) }
         placed = object
         renderPlaced()
+    }
+
+    /// Hands the tool the document's bitmaps for work that does not start with
+    /// a mouse press (paste, select all).
+    func attach(main: NSBitmapImageRep, buffer: NSBitmapImageRep) {
+        mainBitmapRep = main
+        bufferBitmapRep = buffer
     }
 
     /// Draws the placed object into the buffer image.
@@ -117,6 +131,7 @@ enum SWJNPlacementHandle: Equatable {
         guard let placed, let main = mainBitmapRep else { return }
         self.placed = nil
         activeDrag = nil
+        placed.isInteracting = false
 
         SWLockFocus(main)
         placed.render()
@@ -140,6 +155,13 @@ enum SWJNPlacementHandle: Equatable {
 
     override func deleteKey() {
         discard()
+    }
+
+    override func nudge(dx: CGFloat, dy: CGFloat) -> Bool {
+        guard let placed, activeDrag == nil else { return false }
+        placed.nudge(by: NSPoint(x: dx, y: dy))
+        renderPlaced()
+        return true
     }
 
     override func finalise() {

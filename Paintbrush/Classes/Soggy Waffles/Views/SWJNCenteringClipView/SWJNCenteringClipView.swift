@@ -8,28 +8,40 @@
 import Foundation
 
 @objcMembers class SWJNCenteringClipView : NSClipView {
+    /// Shirt canvases show a shirt around them, so the scrollable area grows to fit it.
+    private var showsShirt: Bool {
+        guard let documentView else { return false }
+        return SWJNShirt.isShirtCanvas(documentView.frame.size)
+    }
+
+    /// The area to center and scroll over: the canvas, or the whole shirt.
+    private var contentRect: NSRect? {
+        guard let documentView else { return nil }
+        return showsShirt ? SWJNShirt.bounds(around: documentView.frame) : documentView.frame
+    }
+
     override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {
-        var constrainedBounds: CGRect = super.constrainBoundsRect(proposedBounds)
+        // The shirt reaches past the canvas, which super would clamp to
+        var constrainedBounds: CGRect = showsShirt ? proposedBounds : super.constrainBoundsRect(proposedBounds)
         
-        guard let documentView: NSView else {
+        guard let documentRect = contentRect else {
             return NSRect()
         }
         
-        let documentRect: NSRect = documentView.frame
         
         let maxX: CGFloat = documentRect.width - constrainedBounds.width
         let maxY: CGFloat = documentRect.height - constrainedBounds.height
         
         constrainedBounds.origin.x = if documentRect.width < constrainedBounds.width {
-            round(maxX / 2.0)
+            round(documentRect.minX + maxX / 2.0)
         } else {
-            round(max(0, min(constrainedBounds.origin.x, maxX)))
+            round(max(documentRect.minX, min(constrainedBounds.origin.x, documentRect.minX + maxX)))
         }
         
         constrainedBounds.origin.y = if documentRect.height < constrainedBounds.height {
-            round(maxY / 2.0)
+            round(documentRect.minY + maxY / 2.0)
         } else {
-            round(max(0, min(constrainedBounds.origin.y, maxY)))
+            round(max(documentRect.minY, min(constrainedBounds.origin.y, documentRect.minY + maxY)))
         }
         
         return constrainedBounds
@@ -43,6 +55,10 @@ import Foundation
         }
         
         let rect: NSRect = documentView.frame
+        
+        if showsShirt {
+            SWJNShirt.draw(around: rect, scale: frame.width / max(bounds.width, 1))
+        }
         
         if shadow.isNil {
             shadow = NSShadow()
@@ -108,19 +124,18 @@ import Foundation
     }
     
     func center() {
-        guard let documentView: NSView else {
+        guard let documentRect = contentRect else {
             return
         }
         
-        let documentRect: CGRect = documentView.frame
         var clipRect: CGRect = bounds
         
         if documentRect.width < clipRect.width {
-            clipRect.origin.x = round((documentRect.width - clipRect.width) / 2.0)
+            clipRect.origin.x = round(documentRect.minX + (documentRect.width - clipRect.width) / 2.0)
         }
         
         if documentRect.height < clipRect.height {
-            clipRect.origin.y = round((documentRect.height - clipRect.height) / 2.0)
+            clipRect.origin.y = round(documentRect.minY + (documentRect.height - clipRect.height) / 2.0)
         }
         
         scroll(to: clipRect.origin)

@@ -22,9 +22,10 @@
 #import "SWDocument.h"
 
 
-static NSString *sizeMenuLabels[] = { @"640_480", @"800_600", @"1024_768", @"1280_1024", @"1920_1080" };
-static NSUInteger sizeMenuWidths[] = { 640, 800, 1024, 1280, 1920 };
-static NSUInteger sizeMenuHeights[] = { 480, 600, 768, 1024, 1080 };
+// The T-shirt preset must match SWJNShirt.canvasSize (12 x 16 in at 50 px per inch)
+static NSString *sizeMenuLabels[] = { @"Instagram Reel (1080 × 1920)", @"T-Shirt Print (12 × 16 in)", @"640_480", @"800_600", @"1024_768", @"1280_1024", @"1920_1080" };
+static NSUInteger sizeMenuWidths[] = { 1080, 600, 640, 800, 1024, 1280, 1920 };
+static NSUInteger sizeMenuHeights[] = { 1920, 800, 480, 600, 768, 1024, 1080 };
 static NSUInteger numItems = sizeof(sizeMenuLabels) / sizeof(sizeMenuLabels[0]); // How many size menu items are there?
 static NSUInteger sizeOffset = 3; // How many non-size menu items are there?
 

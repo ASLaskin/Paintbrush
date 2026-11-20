@@ -22,6 +22,7 @@ import Cocoa
         ToolSpec(title: "Line", image: symbol("line.diagonal")),
         ToolSpec(title: "Text", image: symbol("textformat")),
         ToolSpec(title: "Eyedropper", image: symbol("eyedropper")),
+        ToolSpec(title: "Selection", image: symbol("rectangle.dashed")),
     ]
 
     private static let paletteDefaultsKey = "SWJNPaletteColors"
@@ -31,6 +32,8 @@ import Cocoa
 
     private var toolButtons: [NSButton] = []
     private var swatches: [SWJNColorSwatch] = []
+    /// The color being drawn with, which may not be in the palette (eyedropper).
+    private let currentSwatch = SWJNColorSwatch(color: .black, size: NSSize(width: 0, height: 22))
     private let sizeSlider = NSSlider(value: 3, minValue: 1, maxValue: 10, target: nil, action: nil)
     private let sizeLabel = NSTextField(labelWithString: "3")
 
@@ -70,6 +73,7 @@ import Cocoa
         let sizeRow = NSStackView(views: [sizeSlider, sizeLabel])
         sizeRow.spacing = 8
 
+        currentSwatch.toolTip = "Current color"
         let paletteGrid = NSGridView(numberOfColumns: Self.paletteSize, rows: 0)
         paletteGrid.columnSpacing = 6
         paletteGrid.rowSpacing = 4
@@ -95,7 +99,7 @@ import Cocoa
         let stack = NSStackView(views: [
             header("Tools"), toolGrid,
             header("Size"), sizeRow,
-            header("Colors"), paletteGrid,
+            header("Colors"), currentSwatch, paletteGrid,
         ])
         stack.orientation = .vertical
         stack.alignment = .leading
@@ -110,6 +114,7 @@ import Cocoa
             stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
             sizeRow.widthAnchor.constraint(equalTo: toolGrid.widthAnchor),
+            currentSwatch.widthAnchor.constraint(equalTo: paletteGrid.widthAnchor),
         ])
     }
 
@@ -198,6 +203,7 @@ import Cocoa
         sizeLabel.stringValue = "\(size)"
 
         let current = controller.foregroundColor
+        if let current { currentSwatch.color = current }
         for swatch in swatches {
             swatch.isSelected = current.map { swatch.color.isSameColor(as: $0) } ?? false
         }
@@ -261,14 +267,13 @@ final class SWJNColorSwatch: NSView {
     var isSelected = false { didSet { needsDisplay = true } }
     var onClick: (() -> Void)?
 
-    init(color: NSColor) {
+    /// A zero width leaves the width to the caller's constraints.
+    init(color: NSColor, size: NSSize = NSSize(width: 24, height: 24)) {
         self.color = color
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            widthAnchor.constraint(equalToConstant: 24),
-            heightAnchor.constraint(equalToConstant: 24),
-        ])
+        heightAnchor.constraint(equalToConstant: size.height).isActive = true
+        if size.width > 0 { widthAnchor.constraint(equalToConstant: size.width).isActive = true }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
