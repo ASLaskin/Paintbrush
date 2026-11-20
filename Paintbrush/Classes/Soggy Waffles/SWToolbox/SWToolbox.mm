@@ -107,7 +107,6 @@
         [SWJNEraserTool class],
         [SWJNAirbrushTool class],
         [SWJNLineTool class],
-        [SWJNEllipseTool class],
         [SWJNTextTool class],
         [SWJNEyedropperTool class],
         [SWJNZoomTool class]

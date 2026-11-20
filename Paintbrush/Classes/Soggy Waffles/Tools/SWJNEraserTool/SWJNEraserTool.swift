@@ -8,6 +8,15 @@
 import Foundation
 
 @objcMembers class SWJNEraserTool : SWJNTool {
+    /// Eraser width in pixels for sizes 1 to 10. Grows much faster than the brush.
+    private static let widths: [CGFloat] = [4, 8, 14, 20, 28, 38, 50, 64, 80, 100]
+
+    override var effectiveWidth: CGFloat {
+        // lineWidth is 2 * size - 2, so recover the 1 to 10 size
+        let size = Int((lineWidth / 2).rounded()) + 1
+        return Self.widths[min(max(size, 1), Self.widths.count) - 1]
+    }
+
     override func bezierPath(from beginningPoint: CGPoint, to endingPoint: CGPoint) -> NSBezierPath? {
         if bezierPath.isNil {
             bezierPath = NSBezierPath()
@@ -17,7 +26,7 @@ import Foundation
             return nil
         }
         
-        bezierPath.lineWidth = lineWidth
+        bezierPath.lineWidth = effectiveWidth
         
         var from: NSPoint = beginningPoint
         from.x += 0.5

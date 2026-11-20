@@ -22,12 +22,9 @@
 #import "SWToolbox.h"
 #import "SWToolList.h"
 #import "SWDocument.h"
+#import "SWPaintView.h"
 
 #import "Paintbrush-Swift.h"
-
-// Heights for the panel, based on what is shown
-#define LARGE_HEIGHT 467
-#define SMALL_HEIGHT 367
 
 @implementation SWToolboxController
 
@@ -35,7 +32,6 @@
 @synthesize selectionTransparency;
 @synthesize fillStyle;
 @synthesize currentTool;
-@synthesize foregroundColor;
 @synthesize backgroundColor;
 @synthesize activeDocument;
 //@synthesize toolListArray;
@@ -92,6 +88,12 @@
 // Alert the observers that something's going on
 - (void)awakeFromNib
 {	
+	// The toolbox UI is built in code (SWJNToolboxView); the XIB only supplies the panel.
+	self.toolboxView = [[SWJNToolboxView alloc] initWithController:self];
+	[[self window] setContentView:self.toolboxView];
+	[[self window] setContentSize:[self.toolboxView fittingSize]];
+	_previousButton = self.toolboxView.brushButton;
+
 	// Mah toolbox!  MINE!
 	toolbox = [[SWToolbox alloc] initWithDocument:nil];
 	
@@ -101,9 +103,7 @@
 	[self setBackgroundColor:[NSColor whiteColor]];
     [self setFillStyle:SWJNFillStyle::SWJNFillStyleStroke]; // [self setFillStyle:STROKE_ONLY];
 	[self setSelectionTransparency:NO];
-    
-    [self.foregroundColorWell setColor:foregroundColor];
-    [self.backgroundColorWell setColor:backgroundColor];
+
     
     if ([currentTool isEqualToString:@""] && _previousButton)
         [_previousButton setContentTintColor:[NSColor systemBlueColor]];
@@ -111,6 +111,7 @@
     
     if (_previousFillStyleButton)
         [_previousFillStyleButton setContentTintColor:[NSColor systemBlueColor]];
+    [self.toolboxView sync];
 }
 
 
@@ -122,11 +123,7 @@
 	[self setBackgroundColor:[self backgroundColor]];
 	[self setFillStyle:[self fillStyle]];
 	[self setSelectionTransparency:[self selectionTransparency]];
-    
-    if (foregroundColor && backgroundColor) {
-        [self.foregroundColorWell setColor:foregroundColor];
-        [self.backgroundColorWell setColor:backgroundColor];
-    }
+
     
     if ([currentTool isEqualToString:@""] && _previousButton)
         [_previousButton setContentTintColor:[NSColor systemBlueColor]];
@@ -142,10 +139,21 @@
 {
 	// Allows for more line widths with less tick marks
 	lineWidth = 2*width - 2;
-    NSString *systemSymbolName = [NSString stringWithFormat:@"%@.circle.fill", [[NSNumber numberWithInteger:width] stringValue]];
-    _imageView.image = [NSImage imageWithSystemSymbolName:systemSymbolName accessibilityDescription:nil];
+	[self.toolboxView sync];
+	[[activeDocument paintView] setNeedsDisplay:YES];
+}
 
-	//[currentTool setLineWidth:lineWidth];
+
+- (NSColor *)foregroundColor
+{
+	return foregroundColor;
+}
+
+
+- (void)setForegroundColor:(NSColor *)color
+{
+	foregroundColor = color;
+	[self.toolboxView sync];
 }
 
 
@@ -166,22 +174,9 @@
 	// Don't tie up loose ends if there's no tool!
 	currentTool = tool;
 	
-	SWJNTool *tempTool = [toolbox toolForLabel:currentTool];
-		
-    // TODO: reimplement fill and transparency
-	// [fillMatrix setHidden:!tempTool.showFillOptions];
-    // [transparencyMatrix setHidden:!tempTool.showTransparencyOptions];
-	
-	// Handle resizing of tool palette, based on which tool is selected
-	NSRect aRect = [[super window] frame];
-	if (tempTool.showFillOptions || tempTool.showTransparencyOptions) {
-		aRect.origin.y += (aRect.size.height - LARGE_HEIGHT);
-		aRect.size.height = LARGE_HEIGHT;
-	} else {
-		aRect.origin.y += (aRect.size.height - SMALL_HEIGHT);
-		aRect.size.height = SMALL_HEIGHT;
-	}
-	[[super window] setFrame:aRect display:YES animate:YES];
+	[self.toolboxView sync];
+	// Lets the paint view show or hide tool specific overlays (eraser ring)
+	[[activeDocument paintView] setNeedsDisplay:YES];
 }
 
 

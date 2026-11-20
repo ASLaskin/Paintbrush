@@ -180,8 +180,9 @@
 
 - (NSData *)copyMainImageData
 {
+	// Lossless LZW keeps undo snapshots small, which matters with unlimited undo
 	if (mainImage)
-		return [mainImage TIFFRepresentation];
+		return [mainImage TIFFRepresentationUsingCompression:NSTIFFCompressionLZW factor:0];
 	
 	// No image, no data
 	return nil;

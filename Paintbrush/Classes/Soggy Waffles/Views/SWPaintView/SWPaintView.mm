@@ -45,12 +45,8 @@
 	toolboxController = [SWToolboxController sharedToolboxPanelController];
 	isPayingAttention = YES;
 		
-	// Tracking area
-	[self addTrackingArea:[[NSTrackingArea alloc] initWithRect:[self frame]
-														options: NSTrackingMouseMoved | NSTrackingCursorUpdate
-							| NSTrackingEnabledDuringMouseDrag | NSTrackingActiveWhenFirstResponder
-														  owner:self
-													   userInfo:nil]];
+	// Tracking area: see updateTrackingAreas
+	[self updateTrackingAreas];
 	[[self window] setAcceptsMouseMovedEvents:YES];
 		
 	// Grid related
@@ -66,6 +62,29 @@
                                             NSPasteboardTypeTIFF, nil]];
 	
 	[self setNeedsDisplay:YES];	
+}
+
+
+- (void)updateTrackingAreas
+{
+	for (NSTrackingArea *area in [self trackingAreas])
+		[self removeTrackingArea:area];
+
+	[self addTrackingArea:[[NSTrackingArea alloc] initWithRect:NSZeroRect
+													   options:NSTrackingMouseMoved | NSTrackingMouseEnteredAndExited
+							| NSTrackingEnabledDuringMouseDrag | NSTrackingActiveInKeyWindow | NSTrackingInVisibleRect
+														 owner:self
+													  userInfo:nil]];
+	[super updateTrackingAreas];
+}
+
+
+// Take keyboard focus as soon as the canvas is on screen, so shortcuts work without a click first
+- (void)viewDidMoveToWindow
+{
+	[super viewDidMoveToWindow];
+	[[self window] setAcceptsMouseMovedEvents:YES];
+	[[self window] makeFirstResponder:self];
 }
 
 
@@ -134,6 +153,14 @@
 		
 		//CGContextEndTransparencyLayer(cgContext);
 		
+		[self drawEraserRing];
+
+		// Tool UI such as the handles on a just placed line or text
+		[NSGraphicsContext saveGraphicsState];
+		[[NSGraphicsContext currentContext] setShouldAntialias:YES];
+		[toolbox.currentTool drawOverlayWithScale:[self viewScale]];
+		[NSGraphicsContext restoreGraphicsState];
+
 		// If the grid is turned on, draw that too (but only after everything else!
 		if (showsGrid && [(SWJNScalingScrollView *)[[self superview] superview] scale] > 2.0)
 		{
@@ -144,6 +171,80 @@
 		
 		[NSGraphicsContext restoreGraphicsState];
 	}
+}
+
+
+#pragma mark Eraser ring
+
+- (CGFloat)viewScale
+{
+	id scrollView = [[self superview] superview];
+	if ([scrollView isKindOfClass:[SWJNScalingScrollView class]])
+		return MAX([(SWJNScalingScrollView *)scrollView scale], 0.01);
+	return 1.0;
+}
+
+
+- (BOOL)showsEraserRing
+{
+	return isHovering && [toolbox.currentTool isKindOfClass:[SWJNEraserTool class]];
+}
+
+
+// Area covered by the ring, padded for its outline
+- (NSRect)eraserRingRectAt:(NSPoint)point
+{
+	CGFloat radius = MAX(toolbox.currentTool.effectiveWidth, 1.0) / 2.0;
+	CGFloat pad = 3.0 / [self viewScale];
+	return NSInsetRect(NSMakeRect(point.x, point.y, 0, 0), -(radius + pad), -(radius + pad));
+}
+
+
+// Outline of the area the eraser will clear, centered on the pointer
+- (void)drawEraserRing
+{
+	if (![self showsEraserRing])
+		return;
+
+	CGFloat diameter = MAX(toolbox.currentTool.effectiveWidth, 1.0);
+	NSRect circle = NSMakeRect(hoverPoint.x - diameter / 2.0, hoverPoint.y - diameter / 2.0, diameter, diameter);
+	NSBezierPath *ring = [NSBezierPath bezierPathWithOvalInRect:circle];
+	CGFloat onePixel = 1.0 / [self viewScale];
+
+	// Light halo under a dark line, so the ring reads on any color
+	[[NSGraphicsContext currentContext] setShouldAntialias:YES];
+	[ring setLineWidth:3.0 * onePixel];
+	[[NSColor colorWithWhite:1.0 alpha:0.8] setStroke];
+	[ring stroke];
+	[ring setLineWidth:1.0 * onePixel];
+	[[NSColor colorWithWhite:0.0 alpha:0.85] setStroke];
+	[ring stroke];
+}
+
+
+// Moves the ring, repainting only where it was and where it is now
+- (void)moveHoverTo:(NSPoint)point
+{
+	if (isHovering)
+		[self setNeedsDisplayInRect:[self eraserRingRectAt:hoverPoint]];
+	hoverPoint = point;
+	isHovering = YES;
+	[self setNeedsDisplayInRect:[self eraserRingRectAt:hoverPoint]];
+}
+
+
+- (void)mouseEntered:(NSEvent *)event
+{
+	NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
+	[self moveHoverTo:NSMakePoint(floor(p.x) + 0.5, floor(p.y) + 0.5)];
+}
+
+
+- (void)mouseExited:(NSEvent *)event
+{
+	if (isHovering)
+		[self setNeedsDisplayInRect:[self eraserRingRectAt:hoverPoint]];
+	isHovering = NO;
 }
 
 
@@ -227,6 +328,7 @@
                                               for:SWJNMouseEventDragged]);
 		
 		[self setNeedsDisplayInRect:toolbox.currentTool.invalidRect];
+		[self moveHoverTo:NSMakePoint(currentPoint.x + 0.5, currentPoint.y + 0.5)];
 	}
 }
 
@@ -313,6 +415,7 @@
 	motionPoint.x = floor(motionPoint.x) + 0.5;
 	motionPoint.y = floor(motionPoint.y) + 0.5;	
 	[toolbox.currentTool mouseDidMoveTo:motionPoint];
+	[self moveHoverTo:motionPoint];
 }
 
 
@@ -344,15 +447,74 @@
 		[SWImageTools clearImage:[dataSource bufferImage]];
 		[self setNeedsDisplay:YES];
 	} 
+	else if ([event keyCode] == 36 || [event keyCode] == 76)
+	{
+		// Return and Enter: commit whatever the tool has pending (placed line or text)
+		[toolbox finaliseForCurrentTool];
+		[self setNeedsDisplay:YES];
+	}
 	else if ([event keyCode] == 51 || [event keyCode] == 117) 
 	{
 		// Delete keys (back and forward)
 		[self clearOverlay];
 	} 
+	else if ([self handleShortcut:event])
+	{
+		// Handled: size or palette key
+	}
 	else
 	{
 		[[[toolboxController window] contentView] keyDown:event];
 	}
+}
+
+
+// Single key shortcuts: + and - change size, 1 to 5 pick a palette color,
+// Q brush, W eraser, E zoom, M shows or hides the toolbox.
+// Command combos are left for the menus (Command + and - zoom).
+- (BOOL)handleShortcut:(NSEvent *)event
+{
+	NSEventModifierFlags blocking = NSEventModifierFlagCommand | NSEventModifierFlagControl | NSEventModifierFlagOption;
+	if ([event modifierFlags] & blocking)
+		return NO;
+
+	NSString *chars = [event charactersIgnoringModifiers];
+	if ([chars length] != 1)
+		return NO;
+	unichar c = [chars characterAtIndex:0];
+
+	if (c == '+' || c == '=' || c == '-' || c == '_') {
+		NSInteger step = (c == '-' || c == '_') ? -1 : 1;
+		NSInteger size = MIN(MAX([toolboxController lineWidthDisplay] + step, 1), 10);
+		[toolboxController setLineWidthDisplay:size];
+		[self setNeedsDisplay:YES];
+		return YES;
+	}
+
+	switch (c) {
+		case 'q': case 'Q':
+			[toolboxController changeCurrentToolWithString:@"Brush"];
+			return YES;
+		case 'w': case 'W':
+			[toolboxController changeCurrentToolWithString:@"Eraser"];
+			return YES;
+		case 'e': case 'E':
+			[toolboxController changeCurrentToolWithString:@"Zoom"];
+			return YES;
+		case 'm': case 'M':
+			if ([[toolboxController window] isVisible])
+				[toolboxController close];
+			else
+				[toolboxController showWindow:self];
+			return YES;
+	}
+
+	if (c >= '1' && c <= '5') {
+		[[toolboxController toolboxView] selectPaletteIndex:(NSInteger)(c - '1')];
+		return YES;
+	}
+
+	return NO;
 }
 
 

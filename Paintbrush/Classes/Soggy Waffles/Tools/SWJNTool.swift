@@ -32,6 +32,9 @@ import Foundation
     var bezierPath: NSBezierPath? = nil
     
     var lineWidth: CGFloat = 0
+
+    /// Stroke width actually drawn. Tools can map the shared size differently (see eraser).
+    var effectiveWidth: CGFloat { lineWidth }
     
     var fill: Bool = false,
         stroke: Bool = false
@@ -113,10 +116,10 @@ import Foundation
     }
     
     func insertRedrawRect(from beginningPoint: CGPoint, to endingPoint: CGPoint) -> CGRect {
-        insertRedrawRect(to: CGRect(origin: CGPoint(x: round(fmin(beginningPoint.x, endingPoint.x) - (lineWidth / 2) - 1),
-                                                    y: round(fmin(beginningPoint.y, endingPoint.y) - (lineWidth / 2) - 1)),
-                                    size: CGSize(width: (abs(beginningPoint.x - endingPoint.x) + lineWidth + 2),
-                                                 height: (abs(beginningPoint.y - endingPoint.y) + lineWidth + 2))))
+        insertRedrawRect(to: CGRect(origin: CGPoint(x: round(fmin(beginningPoint.x, endingPoint.x) - (effectiveWidth / 2) - 1),
+                                                    y: round(fmin(beginningPoint.y, endingPoint.y) - (effectiveWidth / 2) - 1)),
+                                    size: CGSize(width: (abs(beginningPoint.x - endingPoint.x) + effectiveWidth + 2),
+                                                 height: (abs(beginningPoint.y - endingPoint.y) + effectiveWidth + 2))))
     }
     
     func insertRedrawRect(to rect: CGRect) -> CGRect {
@@ -134,6 +137,8 @@ import Foundation
     
     // MARK: Additional
     func deleteKey() {}
+    /// Draws tool UI (handles, guides) over the canvas in paint view coordinates.
+    func drawOverlay(scale: CGFloat) {}
     func mouseDidMove(to point: NSPoint) {}
     
     func finalise() {

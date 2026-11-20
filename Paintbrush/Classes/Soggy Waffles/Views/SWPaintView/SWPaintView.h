@@ -50,6 +50,10 @@
 	BOOL showsGrid;
 	CGFloat gridSpacing;
 	NSColor *gridColor;
+
+	// Last pointer position over the canvas, for the eraser ring
+	NSPoint hoverPoint;
+	BOOL isHovering;
 }
 
 - (void)preparePaintViewWithDataSource:(SWImageDataSource *)ds
@@ -71,6 +75,9 @@
 - (NSBezierPath *)gridInRect:(NSRect)rect;
 
 - (void)refreshImage:(id)sender;
+
+// Current zoom factor (1 at 100%)
+- (CGFloat)viewScale;
 
 @end
 

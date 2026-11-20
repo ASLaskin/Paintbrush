@@ -24,6 +24,7 @@
 @class SWDocument;
 
 @class SWToolbox;
+@class SWJNToolboxView;
 
 @interface SWToolboxController : NSWindowController {
 	NSColor *foregroundColor;
@@ -47,7 +48,6 @@
 // Accessors
 + (SWToolboxController *)sharedToolboxPanelController;
 
-@property (nonatomic, assign) IBOutlet NSColorWell *foregroundColorWell, *backgroundColorWell;
 
 // Mutators
 // - (IBAction)changeCurrentTool:(id)sender;
@@ -82,5 +82,6 @@
 
 @property (nonatomic, assign) IBOutlet NSButton *previousButton, *previousFillStyleButton;
 @property (nonatomic, assign) IBOutlet NSImageView *imageView;
+@property (nonatomic, strong) SWJNToolboxView *toolboxView;
 @end
 

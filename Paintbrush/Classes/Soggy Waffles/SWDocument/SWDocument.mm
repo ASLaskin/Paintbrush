@@ -305,6 +305,9 @@ static BOOL kSWDocumentWillShowSheet = YES;
 // Saving data: returns the correctly-formatted image data
 - (NSData *)dataOfType:(NSString *)aType error:(NSError **)anError
 {
+	// Stamp any still editable line or text into the image before saving
+	[toolbox finaliseForCurrentTool];
+
     NSBitmapImageRep *bitmap = [dataSource mainImage];
 //    NSBitmapImageRep *bitmap = [SWImageTools createMonochromeImage:[paintView mainImage]];
 

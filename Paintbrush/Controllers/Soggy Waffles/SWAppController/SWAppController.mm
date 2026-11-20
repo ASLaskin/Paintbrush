@@ -65,7 +65,7 @@ NSString * const kSWUndoKey = @"UndoLevels";
 		// Put initial defaults in the dictionary
 		[defaultValues setObject:[NSNumber numberWithInt:640] forKey:@"HorizontalSize"];
 		[defaultValues setObject:[NSNumber numberWithInt:480] forKey:@"VerticalSize"];
-		[defaultValues setObject:[NSNumber numberWithInt:10] forKey:kSWUndoKey];
+		[defaultValues setObject:[NSNumber numberWithInt:0] forKey:kSWUndoKey]; // 0 = unlimited
 		[defaultValues setObject:@"PNG" forKey:@"FileType"];
 		
 		// Register the dictionary of defaults

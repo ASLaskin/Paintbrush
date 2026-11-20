@@ -17,9 +17,9 @@ import Foundation
             }
             
             if flags.contains(.option) {
-                toolboxController.backgroundColorWell.color = converted
+                toolboxController.backgroundColor = converted
             } else {
-                toolboxController.foregroundColorWell.color = converted
+                toolboxController.foregroundColor = converted
             }
         }
         
