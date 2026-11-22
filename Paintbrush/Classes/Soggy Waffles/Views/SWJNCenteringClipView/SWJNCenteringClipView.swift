@@ -8,23 +8,19 @@
 import Foundation
 
 @objcMembers class SWJNCenteringClipView : NSClipView {
-    /// Shirt canvases show a shirt around them, so the scrollable area grows to fit it.
-    private var showsShirt: Bool {
-        guard let documentView else { return false }
-        return SWJNShirt.isShirtCanvas(documentView.frame.size)
-    }
+    private var container: SWJNCanvasContainerView? { documentView as? SWJNCanvasContainerView }
 
-    /// The area to center and scroll over: the canvas, or the whole shirt.
-    private var contentRect: NSRect? {
+    /// The canvas in this view's coordinates.
+    private var canvasRect: NSRect? {
         guard let documentView else { return nil }
-        return showsShirt ? SWJNShirt.bounds(around: documentView.frame) : documentView.frame
+        guard let container else { return documentView.frame }
+        return container.convert(container.canvasRect, to: self)
     }
 
     override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {
-        // The shirt reaches past the canvas, which super would clamp to
-        var constrainedBounds: CGRect = showsShirt ? proposedBounds : super.constrainBoundsRect(proposedBounds)
+        var constrainedBounds: CGRect = super.constrainBoundsRect(proposedBounds)
         
-        guard let documentRect = contentRect else {
+        guard let documentRect = documentView?.frame else {
             return NSRect()
         }
         
@@ -50,13 +46,12 @@ import Foundation
     override func draw(_ dirtyRect: NSRect) {
         NSGraphicsContext.saveGraphicsState()
         
-        guard let documentView: NSView else {
+        guard let rect = canvasRect else {
+            NSGraphicsContext.restoreGraphicsState()
             return
         }
         
-        let rect: NSRect = documentView.frame
-        
-        if showsShirt {
+        if container?.isShirt == true {
             SWJNShirt.draw(around: rect, scale: frame.width / max(bounds.width, 1))
         }
         
@@ -124,7 +119,7 @@ import Foundation
     }
     
     func center() {
-        guard let documentRect = contentRect else {
+        guard let documentRect = documentView?.frame else {
             return
         }
         

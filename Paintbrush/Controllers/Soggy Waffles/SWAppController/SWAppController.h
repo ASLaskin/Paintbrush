@@ -29,6 +29,7 @@ extern NSString * const kSWUndoKey;
 }
 - (IBAction)showPreferencePanel:(id)sender;
 - (IBAction)showToolboxPanel:(id)sender;
+- (IBAction)showShortcutsPanel:(id)sender;
 //- (IBAction)showGridPanel:(id)sender;
 
 // A few methods to open a web page in the user's browser of choice

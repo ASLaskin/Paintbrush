@@ -182,6 +182,18 @@ import Foundation
         documentView?.needsDisplay = true
     }
 
+    // MARK: Panning
+
+    /// Scrolls by a distance in screen points, so a key press moves the same amount at any zoom.
+    func pan(byX dx: CGFloat, y dy: CGFloat) {
+        guard let clipView = contentView as? SWJNCenteringClipView else { return }
+        var bounds = clipView.bounds
+        bounds.origin.x += dx / scale
+        bounds.origin.y += dy / scale
+        clipView.scroll(to: clipView.constrainBoundsRect(bounds).origin)
+        reflectScrolledClipView(clipView)
+    }
+
     func scaleToDefault() {
         currentySelectedIndex = 4
     }

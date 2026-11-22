@@ -103,9 +103,10 @@ static BOOL kSWDocumentWillShowSheet = YES;
 	clipView = [[SWJNCenteringClipView alloc] initWithFrame:[[scrollView contentView] frame]];
 	//[clipView setBackgroundColor:[NSColor windowBackgroundColor]];
 	
-	// The Scroll View contains the clip view, which is the superclass of the paint view (whew!)
+	// Scroll view > clip view > container (canvas plus shirt) > paint view
 	[scrollView setContentView:(NSClipView *)clipView];
-	[clipView setDocumentView:paintView];
+	canvasContainer = [[SWJNCanvasContainerView alloc] initWithCanvas:paintView];
+	[clipView setDocumentView:canvasContainer];
     [scrollView setScaleTo:1.0 adjustingScalePushButton:YES];
 	
     // TODO: remove this?
@@ -154,7 +155,7 @@ static BOOL kSWDocumentWillShowSheet = YES;
 		[scrollView setCurrentySelectedIndex:2]; // 50% in SWJNScalingScrollView.scaleFactors
 		[scrollView setScaleTo:scale adjustingScalePushButton:YES];
 
-		NSSize shirtSize = [SWJNShirt boundsAroundCanvas:[paintView frame]].size;
+		NSSize shirtSize = [canvasContainer frame].size;
 		NSRect content = NSMakeRect(0, 0, shirtSize.width * scale, shirtSize.height * scale);
 		NSRect visible = [[[paintView window] screen] visibleFrame];
 		NSRect frame = [[paintView window] frameRectForContentRect:content];
@@ -632,7 +633,7 @@ static BOOL kSWDocumentWillShowSheet = YES;
 {
 	if ([sender isKindOfClass:[SWJNTool class]]) {
 		// Came from the zoom tool, so get its point
-		NSPoint point = [(SWJNTool *)sender savedPoint];
+		NSPoint point = [paintView convertPoint:[(SWJNTool *)sender savedPoint] toView:canvasContainer];
         if ([scrollView scaleUp])
             [scrollView setScaleTo:scrollView.scale * 2 at:point adjustingScalePushButton:YES];
 	} else {
@@ -647,7 +648,7 @@ static BOOL kSWDocumentWillShowSheet = YES;
 {
 	if ([sender isKindOfClass:[SWJNTool class]]) {
 		// Came from the zoom tool, so get its point
-		NSPoint point = [(SWJNTool *)sender savedPoint];
+		NSPoint point = [paintView convertPoint:[(SWJNTool *)sender savedPoint] toView:canvasContainer];
         if ([scrollView scaleDown])
             [scrollView setScaleTo:scrollView.scale / 2 at:point adjustingScalePushButton:YES];
 	} else {

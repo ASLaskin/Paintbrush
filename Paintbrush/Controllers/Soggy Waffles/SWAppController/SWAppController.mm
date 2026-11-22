@@ -26,6 +26,7 @@
 #import "DebugLog.h"
 #ifndef APPSTORE
 #import "PFMoveApplication.h"
+#import "Paintbrush-Swift.h"
 #import <Sparkle/Sparkle.h>
 #endif // APPSTORE
 
@@ -106,6 +107,12 @@ NSString * const kSWUndoKey = @"UndoLevels";
 	} else {
 		[toolboxPanel showWindow:self];
 	}
+}
+
+
+- (IBAction)showShortcutsPanel:(id)sender
+{
+	[[SWJNShortcutsPanelController shared] toggle];
 }
 
 - (IBAction)showPreferencePanel:(id)sender

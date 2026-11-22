@@ -29,6 +29,7 @@
 @class SWSizeWindowController;
 @class SWResizeWindowController;
 @class SWJNCenteringClipView;
+@class SWJNCanvasContainerView;
 @class SWTextToolWindowController;
 @class SWSavePanelAccessoryController;
 @class SWImageDataSource;
@@ -45,6 +46,7 @@
 	SWToolboxController *toolboxController;
 	SWToolbox *toolbox;
 	SWJNCenteringClipView *clipView;
+	SWJNCanvasContainerView *canvasContainer;	/* Document view: the canvas plus any shirt around it */
 	SWTextToolWindowController *textController;
 	SWSizeWindowController *sizeController;
 	SWResizeWindowController *resizeController;

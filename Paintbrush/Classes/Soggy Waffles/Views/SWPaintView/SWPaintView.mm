@@ -161,11 +161,11 @@
 		[NSGraphicsContext restoreGraphicsState];
 
 		// If the grid is turned on, draw that too (but only after everything else!
-		if (showsGrid && [(SWJNScalingScrollView *)[[self superview] superview] scale] > 2.0)
+		if (showsGrid && [self viewScale] > 2.0)
 		{
 			[gridColor set];
 			[[NSGraphicsContext currentContext] setShouldAntialias:NO];
-			[[self gridInRect:[self frame]] stroke];
+			[[self gridInRect:[self bounds]] stroke];
 		}
 		
 		[NSGraphicsContext restoreGraphicsState];
@@ -177,7 +177,7 @@
 
 - (CGFloat)viewScale
 {
-	id scrollView = [[self superview] superview];
+	id scrollView = [self enclosingScrollView];
 	if ([scrollView isKindOfClass:[SWJNScalingScrollView class]])
 		return MAX([(SWJNScalingScrollView *)scrollView scale], 0.01);
 	return 1.0;
@@ -472,21 +472,31 @@
 }
 
 
-// Arrow keys move whatever is placed by 1 pixel, or 10 with Shift
+// Arrow keys move whatever is placed by 1 pixel (10 with Shift).
+// With nothing placed they pan the view instead (further with Shift).
 - (BOOL)handleArrowKey:(NSEvent *)event
 {
-	CGFloat step = ([event modifierFlags] & NSEventModifierFlagShift) ? 10 : 1;
 	CGFloat dx = 0, dy = 0;
 	switch ([event keyCode]) {
-		case 123: dx = -step; break;
-		case 124: dx = step; break;
-		case 125: dy = step; break;
-		case 126: dy = -step; break;
+		case 123: dx = -1; break;
+		case 124: dx = 1; break;
+		case 125: dy = 1; break;
+		case 126: dy = -1; break;
 		default: return NO;
 	}
-	if (![toolbox.currentTool nudgeWithDx:dx dy:dy])
+	BOOL shift = ([event modifierFlags] & NSEventModifierFlagShift) != 0;
+
+	CGFloat nudge = shift ? 10 : 1;
+	if ([toolbox.currentTool nudgeWithDx:dx * nudge dy:dy * nudge]) {
+		[self setNeedsDisplay:YES];
+		return YES;
+	}
+
+	SWJNScalingScrollView *scrollView = (SWJNScalingScrollView *)[self enclosingScrollView];
+	if (![scrollView isKindOfClass:[SWJNScalingScrollView class]])
 		return NO;
-	[self setNeedsDisplay:YES];
+	CGFloat pan = shift ? 200 : 40; // screen points
+	[scrollView panByX:dx * pan y:dy * pan];
 	return YES;
 }
 
@@ -515,7 +525,8 @@
 
 
 // Single key shortcuts: + and - change size, 1 to 5 pick a palette color,
-// Q brush, W eraser, E zoom, M shows or hides the toolbox.
+// Q brush, W eraser, E zoom, M shows or hides the toolbox, H the shortcuts.
+// Keep SWJNShortcutsPanel in step when changing these.
 // Command combos are left for the menus (Command + and - zoom).
 - (BOOL)handleShortcut:(NSEvent *)event
 {
@@ -551,6 +562,9 @@
 				[toolboxController close];
 			else
 				[toolboxController showWindow:self];
+			return YES;
+		case 'h': case 'H':
+			[[SWJNShortcutsPanelController shared] toggle];
 			return YES;
 	}
 
@@ -604,7 +618,7 @@
     }
 	
     //[gridPath setLineWidth:0.5];
-    [gridPath setLineWidth:(1.0 / [(SWJNScalingScrollView *)[[self superview] superview] scale])];
+    [gridPath setLineWidth:(1.0 / [self viewScale])];
     //[gridPath stroke];
 	return gridPath;
 }
