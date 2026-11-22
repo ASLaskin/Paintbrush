@@ -3,6 +3,8 @@
 //
 
 #import "SWDocument.h"
+#import "SWImageDataSource.h"
+#import "SWJNPixelOps.h"
 
 #import "SWImageTools.h"
 

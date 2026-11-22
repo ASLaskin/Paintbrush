@@ -23,11 +23,21 @@
 
 
 // The T-shirt preset must match SWJNShirt.canvasSize (12 x 16 in at 50 px per inch)
-static NSString *sizeMenuLabels[] = { @"Instagram Reel (1080 × 1920)", @"T-Shirt Print (12 × 16 in)", @"640_480", @"800_600", @"1024_768", @"1280_1024", @"1920_1080" };
-static NSUInteger sizeMenuWidths[] = { 1080, 600, 640, 800, 1024, 1280, 1920 };
-static NSUInteger sizeMenuHeights[] = { 1920, 800, 480, 600, 768, 1024, 1080 };
-static NSUInteger numItems = sizeof(sizeMenuLabels) / sizeof(sizeMenuLabels[0]); // How many size menu items are there?
-static NSUInteger sizeOffset = 3; // How many non-size menu items are there?
+// Half size canvases export at 2x with crisp pixels, so they suit a mouse and still fill a reel.
+// A nil label marks a separator between groups.
+static NSString *sizeMenuLabels[] = {
+	@"Instagram Reel 9:16 (1080 × 1920)", @"Instagram Reel 9:16, half size (540 × 960)",
+	@"Instagram Portrait 3:4 (1080 × 1440)", @"Instagram Portrait 4:5 (1080 × 1350)",
+	@"Instagram Square 1:1 (1080 × 1080)", @"Landscape 16:9 (1920 × 1080)",
+	nil,
+	@"T-Shirt Print (12 × 16 in)",
+	nil,
+	@"640_480", @"800_600", @"1024_768", @"1280_1024" };
+static NSUInteger sizeMenuWidths[] = { 1080, 540, 1080, 1080, 1080, 1920, 0, 600, 0, 640, 800, 1024, 1280 };
+static NSUInteger sizeMenuHeights[] = { 1920, 960, 1440, 1350, 1080, 1080, 0, 800, 0, 480, 600, 768, 1024 };
+static NSUInteger numItems = sizeof(sizeMenuWidths) / sizeof(sizeMenuWidths[0]);
+// Preset menu items are tagged with their index plus this, so separators don't shift anything
+static NSInteger presetTagOffset = 100;
 
 
 @implementation SWSizeWindowController
@@ -73,12 +83,17 @@ static NSUInteger sizeOffset = 3; // How many non-size menu items are there?
 				   keyEquivalent:@""];
 	[buttonMenu addItem:[NSMenuItem separatorItem]];
 	
-	// Add the zoom levels
+	// Add the size presets
 	NSUInteger cnt;
 	for (cnt = 0; cnt < numItems; cnt++) {
-		[buttonMenu addItemWithTitle:NSLocalizedString(sizeMenuLabels[cnt], nil)
-							  action:@selector(changeSizeButton:)
-					   keyEquivalent:@""];
+		if (!sizeMenuLabels[cnt]) {
+			[buttonMenu addItem:[NSMenuItem separatorItem]];
+			continue;
+		}
+		NSMenuItem *item = [buttonMenu addItemWithTitle:NSLocalizedString(sizeMenuLabels[cnt], nil)
+												 action:@selector(changeSizeButton:)
+										  keyEquivalent:@""];
+		[item setTag:presetTagOffset + cnt];
 	}
 	
 	[[NSNotificationCenter defaultCenter] postNotificationName:NSControlTextDidChangeNotification 
@@ -100,10 +115,9 @@ static NSUInteger sizeOffset = 3; // How many non-size menu items are there?
 			[heightField setIntValue:[temp size].height];
 		}
 	} else {
-		NSInteger index = [sizeButton indexOfSelectedItem];
-		if (index >= sizeOffset) {
+		NSInteger index = [[sizeButton selectedItem] tag] - presetTagOffset;
+		if (index >= 0 && index < (NSInteger)numItems && sizeMenuLabels[index]) {
 			// The user selected one of the size presets
-			index -= sizeOffset;
 			[widthField setIntValue:to_int(sizeMenuWidths[index])];
 			[heightField setIntValue:to_int(sizeMenuHeights[index])];
 		}
@@ -128,8 +142,8 @@ static NSUInteger sizeOffset = 3; // How many non-size menu items are there?
 	
 	NSUInteger cnt;
 	for (cnt = 0; cnt < numItems; cnt++) {
-		if (width == sizeMenuWidths[cnt] && height == sizeMenuHeights[cnt]) {
-			[sizeButton selectItemAtIndex:(cnt+sizeOffset)];
+		if (sizeMenuLabels[cnt] && width == sizeMenuWidths[cnt] && height == sizeMenuHeights[cnt]) {
+			[sizeButton selectItemWithTag:presetTagOffset + cnt];
 			isFound = YES;
 			break;
 		}

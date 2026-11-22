@@ -33,6 +33,7 @@
 @class SWTextToolWindowController;
 @class SWSavePanelAccessoryController;
 @class SWImageDataSource;
+@class SWJNRecorder;
 
 @interface SWDocument : NSDocument
 {
@@ -56,11 +57,15 @@
 	NSNotificationCenter *nc;
     
 	NSString *currentFileType;
+
+	// Records the drawing for View > Replay Drawing
+	SWJNRecorder *recorder;
 }
 
 // Properties
 @property (readonly) SWToolbox *toolbox;
 @property (readonly) SWPaintView *paintView;
+@property (readonly) SWJNRecorder *recorder;
 
 
 // Methods called by menu items
@@ -77,6 +82,7 @@
 - (IBAction)invertColors:(id)sender;
 - (void)showTextSheet:(NSNotification *)n;
 - (IBAction)exportImage:(id)sender;
+- (IBAction)showReplay:(id)sender;
 - (void)undoLevelChanged:(NSNotification *)n;
 
 // Sheets for size!

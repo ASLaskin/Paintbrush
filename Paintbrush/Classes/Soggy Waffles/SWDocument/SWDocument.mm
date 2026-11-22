@@ -42,6 +42,7 @@
 // Synthesize our properties here
 @synthesize toolbox;
 @synthesize paintView;
+@synthesize recorder;
 
 // TODO: Nasty hack
 static BOOL kSWDocumentWillShowSheet = YES;
@@ -143,6 +144,12 @@ static BOOL kSWDocumentWillShowSheet = YES;
 {
 	[paintView preparePaintViewWithDataSource:dataSource
 									  toolbox:toolbox];
+
+	// Start recording once the picture exists, picking up this file's recording if it has one
+	if (!recorder)
+		recorder = [[SWJNRecorder alloc] initWithDataSource:dataSource
+													fileURL:[self fileURL]
+												undoManager:[self undoManager]];
 	
 	// Use external method to determine the window bounds
 	NSRect viewRect = [paintView frame];
@@ -187,6 +194,30 @@ static BOOL kSWDocumentWillShowSheet = YES;
 	SWJNExportPanel *panel = [[SWJNExportPanel alloc] initWithImage:upright
 															 isShirt:[SWJNShirt isShirtCanvas:[dataSource size]]];
 	[panel runOn:[self windowForSheet] suggestedName:name];
+}
+
+
+// View > Replay Drawing: plays the strokes back in their own window
+- (IBAction)showReplay:(id)sender
+{
+	if (!recorder)
+		return;
+	[toolbox finaliseForCurrentTool];
+	[SWJNReplayWindowController showWithRecorder:recorder
+									documentName:[self displayName]
+											near:[self windowForSheet]];
+}
+
+
+// Untitled documents closed without saving take their recording with them
+- (void)close
+{
+	if (recorder) {
+		[SWJNReplayWindowController closeWithRecorder:recorder];
+		[recorder closeWithDiscard:([self fileURL] == nil)];
+		recorder = nil;
+	}
+	[super close];
 }
 
 
@@ -321,10 +352,14 @@ static BOOL kSWDocumentWillShowSheet = YES;
 }
 
 -(void) saveToURL:(NSURL *)url ofType:(NSString *)typeName forSaveOperation:(NSSaveOperationType)saveOperation completionHandler:(void (^)(NSError *))completionHandler {
+    NSURL *previousURL = [self fileURL];
     [super saveToURL:url ofType:typeName forSaveOperation:saveOperation completionHandler:^(NSError *error) {
         if (error == nil && (saveOperation == NSSaveOperation || saveOperation == NSSaveAsOperation)) {
             NSURL *fileURL = [self fileURL];
             
+            // Keep the recording with the file (Save As gives the new file its own copy)
+            [self->recorder didSaveTo:fileURL previousURL:previousURL];
+
             NSError *readError = nil;
             if (![self readFromURL:fileURL ofType:typeName error:&readError]) {
                 error = readError;
@@ -485,6 +520,7 @@ static BOOL kSWDocumentWillShowSheet = YES;
 	{
 		// We are reloading an image, so we need to just update the data source
 		void([dataSource initWithURL:URL]);
+		[recorder noteCanvasReplaced];
 	}
 
 	return (dataSource != nil);
@@ -549,6 +585,10 @@ static BOOL kSWDocumentWillShowSheet = YES;
 	
 	// But force a redraw either way
 	[paintView setNeedsDisplay:YES];
+
+	// A new undo step (not undo or redo replaying an old one) closes off a recorded stroke
+	if (![undo isUndoing] && ![undo isRedoing])
+		[recorder noteUndoRegistration];
 }
 
 

@@ -284,6 +284,13 @@
                                     <action selector="showGrid:" target="-1" id="499"/>
                                 </connections>
                             </menuItem>
+                            <menuItem isSeparatorItem="YES" id="SWJ-Rp-sep"/>
+                            <menuItem title="Replay Drawing…" keyEquivalent="r" id="SWJ-Rp-itm">
+                                <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
+                                <connections>
+                                    <action selector="showReplay:" target="-1" id="SWJ-Rp-act"/>
+                                </connections>
+                            </menuItem>
                         </items>
                     </menu>
                 </menuItem>

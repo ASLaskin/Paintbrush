@@ -94,7 +94,9 @@ import Foundation
         
         SWUnlockFocus(bufferBitmapRep)
         
-        paintView.refreshImage(nil)
+        // Only the spray changed; a full repaint every tick is wasted work (and makes the recorder rescan everything)
+        let pad = lineWidth + 2
+        paintView.setNeedsDisplay(redrawRect.insetBy(dx: -pad, dy: -pad))
     }
     
     func finaliseAirbrushing(with timer: Timer? = nil) {

@@ -291,6 +291,7 @@
 - (void)mouseDown:(NSEvent *)event
 {
 	isPayingAttention = YES;
+	[[self recordingDocument].recorder beginGesture];
 	NSPoint p = [event locationInWindow];
 	NSPoint downPoint = [self convertPoint:p fromView:nil];
 	
@@ -498,6 +499,31 @@
 	CGFloat pan = shift ? 200 : 40; // screen points
 	[scrollView panByX:dx * pan y:dy * pan];
 	return YES;
+}
+
+
+#pragma mark Recording
+
+// The document this view draws, for the drawing recorder
+- (SWDocument *)recordingDocument
+{
+	return document ?: [[[self window] windowController] document];
+}
+
+
+// Every change to the picture asks for a redraw, so the recorder looks there
+- (void)setNeedsDisplayInRect:(NSRect)rect
+{
+	[super setNeedsDisplayInRect:rect];
+	[[self recordingDocument].recorder noteDirty:rect];
+}
+
+
+- (void)setNeedsDisplay:(BOOL)flag
+{
+	[super setNeedsDisplay:flag];
+	if (flag)
+		[[self recordingDocument].recorder noteDirty:[self bounds]];
 }
 
 
